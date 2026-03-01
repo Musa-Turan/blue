@@ -1,0 +1,25 @@
+<group name="windows, custom_alerts,">
+
+  <!-- Yeni Kullanıcı Oluşturma (Event ID 4720) -->
+  <rule id="100010" level="12">
+    <if_sid>60103</if_sid>
+    <field name="win.system.eventID">^4720$</field>
+    <description>Kritik: Sistemde Yeni Bir Kullanıcı Hesabı Oluşturuldu!</description>
+    <mitre>
+      <id>T1136.001</id>
+    </mitre>
+  </rule>
+
+  <!-- CMD/PowerShell üzerinden net user komutu (Event ID 4688 - Process Creation) -->
+  <rule id="100011" level="12">
+    <if_sid>60103</if_sid>
+    <field name="win.system.eventID">^4688$</field>
+    <match>net.exe user|net user</match>
+    <description>Çok Kritik: Komut Satırı Üzerinden Kullanıcı İşlemi (net user) Tespit Edildi!</description>
+    <mitre>
+      <id>T1087.001</id>
+      <id>T1059.003</id>
+    </mitre>
+  </rule>
+
+</group>
