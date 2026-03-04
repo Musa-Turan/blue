@@ -165,3 +165,91 @@ class WazuhConnector(BaseConnector):
         Placeholder implementation.
         """
         return f"Wazuh query executed for {self.tenant_id} on {self.api_ip}. Results: No anomalies detected in past 1 hr."
+
+    def isolate_endpoint(self, agent_id: str) -> bool:
+        """
+        Executes the built-in 'firewall-drop' active response script to cut off
+        all network connectivity to the compromised Wazuh agent.
+        """
+        if not self.authenticate(): return False
+        
+        headers = {'Authorization': f'Bearer {self.token}'}
+        payload = {
+            "command": "firewall-drop",
+            "arguments": ["-", "-", "any"],
+            "custom": False,
+            "alert": {}
+        }
+        
+        try:
+            url = f"{self.base_url}/active-response?agents_list={agent_id}"
+            response = requests.put(url, headers=headers, json=payload, verify=False, timeout=10)
+            
+            if response.status_code == 200:
+                print(f"[ACTION] Wazuh firewall-drop executed on Agent {agent_id}. Network isolated.")
+                return True
+            else:
+                print(f"[ERROR] Failed to isolate Agent {agent_id}. Response: {response.text}")
+                return False
+        except Exception as e:
+            print(f"[ERROR] Active Response Exception: {str(e)}")
+            return False
+
+    def unisolate_endpoint(self, agent_id: str) -> bool:
+        """
+        Reverses the 'firewall-drop' active response script to restore
+        network connectivity to the Wazuh agent.
+        """
+        if not self.authenticate(): return False
+        
+        headers = {'Authorization': f'Bearer {self.token}'}
+        payload = {
+            "command": "!firewall-drop",
+            "arguments": ["-", "-", "any"],
+            "custom": False,
+            "alert": {}
+        }
+        
+        try:
+            url = f"{self.base_url}/active-response?agents_list={agent_id}"
+            response = requests.put(url, headers=headers, json=payload, verify=False, timeout=10)
+            
+            if response.status_code == 200:
+                print(f"[ACTION] Wazuh !firewall-drop (Restore) executed on Agent {agent_id}. Network restored.")
+                return True
+            else:
+                print(f"[ERROR] Failed to restore Agent {agent_id}. Response: {response.text}")
+                return False
+        except Exception as e:
+            print(f"[ERROR] Active Response Restore Exception: {str(e)}")
+            return False
+
+    def get_vulnerabilities(self, agent_id: str) -> List[Dict[str, Any]]:
+        """
+        Fetches all unpatched vulnerabilities (CVEs) for a specific Wazuh agent.
+        """
+        if not self.authenticate(): return []
+        
+        headers = {'Authorization': f'Bearer {self.token}'}
+        vulns = []
+        try:
+            # We fetch up to 100 vulnerabilities, sorted by severity
+            url = f"{self.base_url}/vulnerability/{agent_id}?limit=100&sort=-severity"
+            response = requests.get(url, headers=headers, verify=False, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json().get('data', {}).get('affected_items', [])
+                for v in data:
+                    vulns.append({
+                        "cve": v.get("cve", "Bilinmiyor"),
+                        "severity": v.get("severity", "Medium"),
+                        "cvss_score": v.get("cvss3_score", v.get("cvss2_score", "N/A")),
+                        "software": v.get("name", "N/A"),
+                        "version": v.get("version", "N/A"),
+                        "status": "Unpatched",
+                        "published": v.get("published", "")
+                    })
+            return vulns
+        except Exception as e:
+            print(f"[ERROR] Failed to fetch vulnerabilities for {agent_id}: {str(e)}")
+            return []

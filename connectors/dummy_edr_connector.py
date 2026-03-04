@@ -51,3 +51,42 @@ class DummyEDRConnector(BaseConnector):
 
     def get_raw_logs_for_ai(self, query: str) -> str:
         return f"DUMMY_LOG: Executed query [{query}] across {self.vendor_name} for tenant {self.tenant_id}."
+
+    def isolate_endpoint(self, agent_id: str) -> bool:
+        """
+        Simulates isolating an endpoint on a commercial EDR.
+        """
+        print(f"[ACTION] DummyEDR: Simulate network isolation for Agent {agent_id}. Success.")
+        return True
+
+    def unisolate_endpoint(self, agent_id: str) -> bool:
+        """
+        Simulates restoring network access.
+        """
+        print(f"[ACTION] DummyEDR: Simulate network restore for Agent {agent_id}. Success.")
+        return True
+
+    def get_vulnerabilities(self, agent_id: str) -> List[Dict[str, Any]]:
+        """
+        Simulates vulnerability fetching for Dummy EDR.
+        """
+        return [
+            {
+                "cve": "CVE-2021-44228",
+                "severity": "Critical",
+                "cvss_score": 10.0,
+                "software": "Apache Log4j2",
+                "version": "2.14.1",
+                "status": "Unpatched",
+                "published": "2021-12-10T10:15:00Z"
+            },
+            {
+                "cve": "CVE-2023-38831",
+                "severity": "High",
+                "cvss_score": 7.8,
+                "software": "WinRAR",
+                "version": "6.22",
+                "status": "Unpatched",
+                "published": "2023-08-23T15:15:00Z"
+            }
+        ]

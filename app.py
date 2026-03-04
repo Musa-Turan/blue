@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+from datetime import datetime
 from dotenv import load_dotenv
 import os
 import urllib3
@@ -76,8 +77,14 @@ if st.sidebar.button("🔄 Verileri Yenile", use_container_width=True):
     get_connector.clear()
     st.rerun()
 
-# --- TABS ---
-tab1, tab2, tab3 = st.tabs(["🚨 Olay Yönetimi (Incidents)", "💻 Uç Noktalar (Endpoints)", "🤖 AI Analist (MCP)"])
+# Define application tabs
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "🚨 Olay Yönetimi (Incidents)", 
+    "💻 Uç Noktalar (Endpoints)", 
+    "🤖 AI Analist (MCP)",
+    "🛡️ Zafiyet Yönetimi (Vulnerabilities)",
+    "📊 Raporlama (SLA)"
+])
 
 with tab1:
     st.subheader(f"🚨 {st.session_state.current_tenant} - Genel Olay Yöneticisi")
@@ -117,7 +124,55 @@ with tab1:
             # Fallback for older pandas versions
             styled_df = filtered_df.style.applymap(color_severity, subset=['Önem'])
 
-        st.dataframe(styled_df, use_container_width=True, height=500)
+        st.dataframe(styled_df, use_container_width=True, height=400)
+        
+        # --- SOAR (Active Response) SECTION ---
+        st.markdown("---")
+        st.subheader("⚡ Aktif Müdahale (SOAR)")
+        st.markdown("Tehdit algılanan makineyi anında ağdan izole ederek (Firewall Drop) saldırının yayılmasını önleyin.")
+        
+        # Sadece kritik alarm üreten makineleri listele
+        threat_agents = df_events[df_events['Önem'].isin(['Critical', 'High'])]['Ajan'].unique()
+        
+        if len(threat_agents) > 0:
+            c_action1, c_action2, c_action3 = st.columns([2, 1, 1])
+            with c_action1:
+                target_agent = st.selectbox("İzole Edilecek / Açılacak Makineyi Seçin:", threat_agents)
+            
+            # Extract agent ID from "AgentName (ID)" format
+            import re
+            agent_id = None
+            match = re.search(r'\((.*?)\)', target_agent)
+            if match:
+                agent_id = match.group(1).strip()
+            
+            with c_action2:
+                st.write("") # Spacer
+                st.write("")
+                if st.button("🔴 Ağı Kes (İzole Et)", use_container_width=True, type="primary"):
+                    if agent_id:
+                        with st.spinner(f"{target_agent} acil durum izolasyonuna alınıyor..."):
+                            success = connector.isolate_endpoint(agent_id=agent_id)
+                            if success:
+                                st.success(f"BAŞARILI! {target_agent} makinesinin tüm ağ ve internet iletişimi EDR üzerinden kesildi.")
+                                st.balloons()
+                            else:
+                                st.error("İzolasyon API çağrısı başarısız oldu. Logları kontrol edin.")
+            
+            with c_action3:
+                st.write("") # Spacer
+                st.write("")
+                if st.button("🟢 İzoleyi Kaldır (Ağı Aç)", use_container_width=True):
+                    if agent_id:
+                        with st.spinner(f"{target_agent} ağ erişimi geri yükleniyor..."):
+                            success = connector.unisolate_endpoint(agent_id=agent_id)
+                            if success:
+                                st.success(f"BAŞARILI! {target_agent} makinesinin ağ iletişimi tekrar sağlandı.")
+                            else:
+                                st.error("İzolasyon kaldırma API çağrısı başarısız oldu.")
+        else:
+            st.info("Şu anda acil müdahale gerektiren kritik bir tehdit bulunmuyor.")
+
     else:
         st.success("Tebrikler! Aktif bir ihlal bulunamadı.")
 
@@ -163,18 +218,163 @@ with tab3:
 
         # Display assistant response in chat message container
         with st.chat_message("assistant"):
-            st.markdown("⏳ SOC ortamına bağlanıldı. Loglar inceleniyor...")
-            
-            # Simulated Response showing the power of the tool WITHOUT needing an OpenAI API Key
-            import time
-            time.sleep(1) # Simulate thinking
-            
-            if "Ahmet" in st.session_state.current_tenant:
-                response = f"**Analiz Raporu:** {st.session_state.current_tenant} ortamında `ds-001` isimli sunucuda şüpheli PowerShell yürütülmesi tespit ettim. Bu durum bir fidye yazılımı (Ransomware) faaliyetiyle eşleşiyor. İzole etmemi onaylıyor musunuz?"
-            else:
-                response = f"**Analiz Raporu:** {st.session_state.current_tenant} ortamında `anapc` makinesinde Peş peşe `net user` komutu çalıştırılmış. Kural 100011 ihlal edildi. Bu durum bir keşif (Discovery) girişimi olabilir. EDR üzerinden makinenin ağ erişimini keseyim mi?"
-            
+            with st.spinner("⏳ SOC ortamına bağlanıldı. Loglar inceleniyor ve AI analizine gönderiliyor..."):
+                try:
+                    from google import genai
+                    
+                    # 1. Fetch the latest alerts from the Connector for context
+                    recent_alerts = connector.get_alerts(limit=25)
+                    alert_context = "Veritabanında Kayıtlı Son Olaylar:\n"
+                    for a in recent_alerts:
+                        alert_context += f"- [{a.severity}] {a.incident_type} (Kural: {a.description}) Makine: {a.agent_name}\n"
+                    
+                    # 2. Build the exact prompt for Gemini
+                    system_instructions = f"Sen kıdemli bir L2 SOC analistisin. Müşterinin (Tenant: {st.session_state.current_tenant}) güvenlik loglarını analiz ediyorsun. Sana verilen log verilerine göre kullanıcının '{prompt}' sorusunu yanıtla. Sadece önemli ihlallere odaklan ve izolasyon/tehdit avı tavsiyesi ver. Yanıtı markdown formatında ve profesyonel bir Türkçe Siber Güvenlik jargonuyla (örn. yanal hareket, yetki yükseltme) ver."
+                    full_prompt = f"{system_instructions}\n\n{alert_context}"
+                    
+                    # 3. Call Gemini API
+                    api_key = os.getenv("GEMINI_API_KEY")
+                    if not api_key:
+                        raise ValueError("GEMINI_API_KEY ortam değişkeni bulunamadı. Lütfen .env dosyanızı kontrol edin.")
+                        
+                    client = genai.Client(api_key=api_key)
+                    gemini_response = client.models.generate_content(
+                        model='gemini-2.5-flash',
+                        contents=full_prompt,
+                    )
+                    response = gemini_response.text
+                except Exception as e:
+                    response = f"**🤖 AI Bağlantı Hatası:** Model ile iletişim kurulamadı. Hata detayı: `{str(e)}`"
+                
             st.markdown(response)
             
         # Add assistant response to chat history
         st.session_state.messages.append({"role": "assistant", "content": response})
+
+with tab4:
+    st.subheader("🛡️ Uç Nokta Zafiyet Yönetimi (Vulnerability Management)")
+    st.markdown("Ağa bağlı makinelerdeki güncellenmemiş yazılımları ve kritik güvenlik açıklarını (CVE) tespit edin.")
+    
+    if endpoints:
+        active_endpoints = [f"{e['name']} ({e['id']})" for e in endpoints if e['status'] == 'active']
+        
+        if active_endpoints:
+            selected_agent_str = st.selectbox("Zafiyet Taraması Yapılacak Makineyi Seçin:", active_endpoints)
+            
+            import re
+            match = re.search(r'\((.*?)\)', selected_agent_str)
+            if match:
+                selected_agent_id = match.group(1).strip()
+                
+                with st.spinner(f"{selected_agent_str} makinesi için zafiyet taraması başlatılıyor..."):
+                    vulns = connector.get_vulnerabilities(agent_id=selected_agent_id)
+                
+                if vulns:
+                    st.warning(f"⚠️ {selected_agent_str} üzerinde **{len(vulns)}** adet yama bekleyen zafiyet (CVE) bulundu!")
+                    
+                    df_vulns = pd.DataFrame(vulns)
+                    
+                    # Ensure columns are ordered and translated for the UI
+                    df_vulns = df_vulns.rename(columns={
+                        "cve": "CVE ID",
+                        "severity": "Kritiklik",
+                        "cvss_score": "CVSS Puanı",
+                        "software": "Yazılım / Uygulama",
+                        "version": "Sürüm",
+                        "status": "Durum",
+                        "published": "Yayınlanma Tarihi"
+                    })
+                    
+                    def color_vuln_severity(val):
+                        color_map = {'Critical': 'darkred', 'High': 'red', 'Medium': 'orange', 'Low': 'darkkhaki'}
+                        color = color_map.get(val, '')
+                        return f'background-color: {color}; color: white' if val in ['Critical', 'High'] else f'background-color: {color}; color: black'
+
+                    try:
+                        styled_vulns = df_vulns.style.map(color_vuln_severity, subset=['Kritiklik'])
+                    except AttributeError:
+                        styled_vulns = df_vulns.style.applymap(color_vuln_severity, subset=['Kritiklik'])
+
+                    st.dataframe(styled_vulns, use_container_width=True, height=500)
+                else:
+                    st.success(f"✅ Harika! {selected_agent_str} makinesinde bilinen hiçbir zafiyet bulunamadı. Sistem güncel.")
+        else:
+            st.info("Zafiyet taraması yapılabilecek aktif (çevrimiçi) bir makine bulunamadı.")
+    else:
+        st.info("Sisteme kayıtlı hiçbir uç nokta bulunamadı.")
+
+with tab5:
+    st.subheader("📊 Otomatik SOC/SLA Raporu")
+    st.markdown("Müşterinize (Tenant) sunmak üzere güncel güvenlik duruşunu özetleyen profesyonel bir rapor oluşturun.")
+    
+    c_rep1, c_rep2 = st.columns([2, 1])
+    with c_rep1:
+        report_period = st.selectbox("Rapor Dönemi:", ["Son 24 Saat", "Son 7 Gün", "Son 30 Gün"])
+        report_author = st.text_input("Hazırlayan Analist:", value="Musa Holding L2 SOC Team")
+    
+    with c_rep2:
+        st.write("")
+        st.write("")
+        generate_btn = st.button("📄 Raporu Sentezle", use_container_width=True, type="primary")
+
+    if generate_btn:
+        with st.spinner("SLA Raporu derleniyor..."):
+            # Prepare data
+            t_name = st.session_state.current_tenant
+            date_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+            
+            # Fetch fresh alerts if not already in memory
+            rep_alerts = connector.get_alerts(limit=100)
+            crit_count = sum(1 for a in rep_alerts if a.severity == "Critical")
+            high_count = sum(1 for a in rep_alerts if a.severity == "High")
+            
+            # Building the Markdown Report
+            report_md = f"""# 🛡️ SİBER GÜVENLİK DURUM RAPORU (SLA)
+**Müşteri (Kurum):** {t_name}
+**Tarih:** {date_str}
+**Hazırlayan:** {report_author}
+**Dönem:** {report_period}
+
+---
+
+## 1. YÖNETİCİ ÖZETİ
+Belirtilen dönem içerisinde **{t_name}** altyapısında bulunan **{len(endpoints)}** adet uç nokta (Endpoint) başarıyla izlenmiş ve {len(rep_alerts)} adet şüpheli güvenlik olayı analiz edilmiştir. SOC ekibi tarafından kritik alarmlara anında müdahale (Active Response) gerçekleştirilmiştir.
+
+## 2. UÇ NOKTA DURUMU (EDR/XDR)
+- **Kapsamdaki Toplam Cihaz:** {len(endpoints)}
+- **Aktif (Sağlıklı) Cihazlar:** {len(active_endpoints)}
+- **Çevrimdışı Cihazlar:** {len(disconnected_endpoints)}
+
+## 3. TEHDİT VE İHLAL YÖNETİMİ
+Tespit edilen en son {len(rep_alerts)} uyarının ciddiyet dağılımı:
+- 🔴 **Kritik (Critical):** {crit_count} adet
+- 🟠 **Yüksek (High):** {high_count} adet
+- 🟡 **Orta/Düşük (Medium/Low):** {len(rep_alerts) - crit_count - high_count} adet
+
+### Tespit Edilen Önemli Bulgular:
+"""
+            # Append top 5 critical/high alerts
+            top_alerts = [a for a in rep_alerts if a.severity in ["Critical", "High"]][:5]
+            if top_alerts:
+                for idx, alert in enumerate(top_alerts, 1):
+                    report_md += f"{idx}. **[{alert.severity}]** {alert.incident_type} - {alert.agent_name} makinesinde gerçekleşti.\n"
+                    report_md += f"   *Açıklama:* {alert.description}\n"
+            else:
+                report_md += "> Bu dönem içerisinde kritik veya yüksek seviyeli bir ihlal saptanmamıştır.\n"
+                
+            report_md += "\n---\n*Bu rapor Musa Holding Merkezi XDR Platformu tarafından otomatik olarak oluşturulmuştur.*"
+            
+            st.success("Rapor başarıyla sentezlendi!")
+            
+            # Display preview
+            with st.expander("Görsel Rapor Önizlemesi", expanded=True):
+                st.markdown(report_md)
+                
+            # Download button
+            st.download_button(
+                label="📥 Raporu Markdown (.md) Olarak İndir",
+                data=report_md,
+                file_name=f"{t_name}_SOC_Raporu_{date_str[:10]}.md",
+                mime="text/markdown",
+                use_container_width=True
+            )

@@ -32,3 +32,18 @@ class BaseConnector(ABC):
     def get_raw_logs_for_ai(self, query: str) -> str:
         """Endpoint intended specifically for the MCP/AI Layer to run deep queries."""
         pass
+        
+    @abstractmethod
+    def isolate_endpoint(self, agent_id: str) -> bool:
+        """Trigger an Active Response script (e.g., firewall-drop) to isolate a compromised machine."""
+        pass
+
+    @abstractmethod
+    def unisolate_endpoint(self, agent_id: str) -> bool:
+        """Removes the Active Response network isolation firewall rule."""
+        pass
+        
+    @abstractmethod
+    def get_vulnerabilities(self, agent_id: str) -> List[Dict[str, Any]]:
+        """Fetch all unpatched CVEs (Vulnerabilities) for a specific endpoint."""
+        pass

@@ -21,5 +21,113 @@
       <id>T1059.003</id>
     </mitre>
   </rule>
+  <!-- Event Log Silinmesi (Event ID 1102 / 104) -->
+  <rule id="100012" level="12">
+    <if_sid>60103</if_sid>
+    <field name="win.system.eventID">^1102$|^104$</field>
+    <description>Kritik: Sistem Güvenlik Logları (Event Logs) Silindi!</description>
+    <mitre>
+      <id>T1070.001</id>
+    </mitre>
+  </rule>
+
+  <!-- Mimikatz Kullanımı veya LSASS Bellek Dökümü Alma (Event ID 4688) -->
+  <rule id="100013" level="12">
+    <if_sid>60103</if_sid>
+    <field name="win.system.eventID">^4688$</field>
+    <match>mimikatz|sekurlsa|procdump|lsass</match>
+    <description>Çok Kritik: Mimikatz veya LSASS Bellek Dökümü Aktivitesi Tespit Edildi!</description>
+    <mitre>
+      <id>T1003.001</id>
+    </mitre>
+  </rule>
+
+  <!-- RDP Brute Force Denemeleri (Aynı IP'den çoklu Event ID 4625) -->
+  <rule id="100014" level="10" frequency="5" timeframe="60">
+    <if_matched_sid>60122</if_matched_sid>
+    <same_source_ip />
+    <description>Yüksek: RDP Brute Force (Kaba Kuvvet) Parola Saldırısı Tespit Edildi (60sn içinde 5+ başarısız giriş).</description>
+    <mitre>
+      <id>T1110.001</id>
+    </mitre>
+  </rule>
+
+  <!-- Gizlenmiş/Encoded PowerShell Komutları (Base64) -->
+  <rule id="100015" level="10">
+    <if_sid>60103</if_sid>
+    <field name="win.system.eventID">^4688$|^4104$</field>
+    <match>-e | -enc | -encodedCommand</match>
+    <description>Yüksek: Şifrelenmiş (Base64) PowerShell Komutu Çalıştırıldı!</description>
+    <mitre>
+      <id>T1059.001</id>
+      <id>T1027</id>
+    </mitre>
+  </rule>
+
+  <!-- VSS (Gölge Kopya) Silinmesi - Ransomware Davranışı -->
+  <rule id="100016" level="12">
+    <if_sid>60103</if_sid>
+    <field name="win.system.eventID">^4688$</field>
+    <match>vssadmin delete shadows</match>
+    <description>Kritik: Ransomware Davranışı! Gölge Kopyalar (Volume Shadow Copys) Siliniyor!</description>
+    <mitre>
+      <id>T1490</id>
+    </mitre>
+  </rule>
+
+  <!-- Windows Defender Devre Dışı Bırakma Girişimi -->
+  <rule id="100017" level="11">
+    <if_sid>60103</if_sid>
+    <field name="win.system.eventID">^4688$</field>
+    <match>DisableRealtimeMonitoring|Set-MpPreference -Disable</match>
+    <description>Kritik: Windows Defender Devre Dışı Bırakılmaya Çalışılıyor!</description>
+    <mitre>
+      <id>T1562.001</id>
+    </mitre>
+  </rule>
+
+  <!-- Şüpheli Ağdan İndirme (Certutil.exe İstismarı) -->
+  <rule id="100018" level="10">
+    <if_sid>60103</if_sid>
+    <field name="win.system.eventID">^4688$</field>
+    <match>certutil.exe -urlcache -split -f</match>
+    <description>Yüksek: Certutil Aracı ile Şüpheli Dosya İndirme Tespit Edildi!</description>
+    <mitre>
+      <id>T1105</id>
+    </mitre>
+  </rule>
+
+  <!-- Yetki Yükseltme: Administrators Grubuna Kullanıcı Ekleme -->
+  <rule id="100019" level="12">
+    <if_sid>60103</if_sid>
+    <field name="win.system.eventID">^4732$</field>
+    <match>Administrators|Yöneticiler</match>
+    <description>Çok Kritik: Bir Kullanıcı Yöneticiler (Administrators) Grubuna Eklendi!</description>
+    <mitre>
+      <id>T1098</id>
+    </mitre>
+  </rule>
+
+  <!-- Bilinen Zararlı (Malware) Klasörlerinden Çalıştırma (Temp/AppData) -->
+  <rule id="100020" level="8">
+    <if_sid>60103</if_sid>
+    <field name="win.system.eventID">^4688$</field>
+    <match>C:\\Windows\\Temp\\|C:\\Users\\*\AppData\\Local\\Temp\\</match>
+    <description>Orta: Temp (Geçici) Klasöründen Şüpheli Executable (.exe) Çalıştırıldı.</description>
+    <mitre>
+      <id>T1036</id>
+    </mitre>
+  </rule>
+
+  <!-- Güvenlik Duvarı (Firewall) Kapatma Komutu -->
+  <rule id="100021" level="10">
+    <if_sid>60103</if_sid>
+    <field name="win.system.eventID">^4688$</field>
+    <match>netsh advfirewall set allprofiles state off</match>
+    <description>Kritik: Windows Güvenlik Duvarı (Firewall) Kapatıldı!</description>
+    <mitre>
+      <id>T1562.004</id>
+    </mitre>
+  </rule>
 
 </group>
