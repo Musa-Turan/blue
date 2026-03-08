@@ -16,19 +16,61 @@ load_dotenv()
 
 st.set_page_config(page_title="SOC Platform v7.0", layout="wide", page_icon="🛡️")
 
-st.title("🛡️ MSSP Yön. Güvenlik Operasyon Merkezi (XDR)")
+from core.auth import authenticate_user
 
-# --- TENANT SELECTION ---
-if "current_tenant" not in st.session_state:
-    st.session_state.current_tenant = "Musa Holding (Wazuh)"
+# --- AUTHENTICATION ---
+if "user_profile" not in st.session_state:
+    st.session_state.user_profile = None
 
+if st.session_state.user_profile is None:
+    st.markdown("## 🔒 MSSP Müşteri Portalı Girişi")
+    with st.form("login_form"):
+        username = st.text_input("Kullanıcı Adı")
+        password = st.text_input("Şifre", type="password")
+        submitted = st.form_submit_button("Giriş Yap", type="primary")
+        
+        if submitted:
+            user = authenticate_user(username, password)
+            if user:
+                st.session_state.user_profile = user
+                
+                # If they are a client, lock them to their tenant. If admin, default to Musa.
+                if user["role"] == "Client_Admin":
+                    st.session_state.current_tenant = user["allowed_tenant"]
+                else:
+                    st.session_state.current_tenant = "Musa Holding (Wazuh)"
+                    
+                st.rerun()
+            else:
+                st.error("Kullanıcı adı veya şifre hatalı!")
+                
+    st.stop() # Halt execution if not logged in
+
+# --- APP EXECUTION (LOGGED IN) ---
+user = st.session_state.user_profile
+
+st.sidebar.header(f"🧑‍💻 Hoş Geldin, {user['username']}")
+st.sidebar.write(f"*{user['description']}*")
+if st.sidebar.button("🚪 Çıkış Yap"):
+    st.session_state.user_profile = None
+    st.rerun()
+
+st.sidebar.divider()
 st.sidebar.header("🏢 MSSP Kontrol Paneli")
-tenant_choice = st.sidebar.selectbox(
-    "Müşteri (Tenant) Seçiniz:",
-    ["Musa Holding (Wazuh)", "Ahmet Lojistik (Dummy EDR)"],
-    index=0 if st.session_state.current_tenant == "Musa Holding (Wazuh)" else 1
-)
-st.session_state.current_tenant = tenant_choice
+
+# --- TENANT SELECTION (RBAC) ---
+if user["role"] == "L2_Analyst":
+    # Admin can choose the tenant
+    tenant_choice = st.sidebar.selectbox(
+        "Müşteri (Tenant) Seçiniz:",
+        ["Musa Holding (Wazuh)", "Ahmet Lojistik (Dummy EDR)"],
+        index=0 if st.session_state.current_tenant == "Musa Holding (Wazuh)" else 1
+    )
+    st.session_state.current_tenant = tenant_choice
+else:
+    # Client is locked to their allowed tenant
+    st.sidebar.info(f"Geçerli Kurum: **{user['allowed_tenant']}**")
+    st.session_state.current_tenant = user["allowed_tenant"]
 
 # Initialize Connector dynamically
 @st.cache_resource(show_spinner=False)
@@ -78,19 +120,38 @@ if st.sidebar.button("🔄 Verileri Yenile", use_container_width=True):
     st.rerun()
 
 # Define application tabs
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
     "🚨 Olay Yönetimi (Incidents)", 
     "💻 Uç Noktalar (Endpoints)", 
     "🤖 AI Analist (MCP)",
     "🛡️ Zafiyet Yönetimi (Vulnerabilities)",
-    "📊 Raporlama (SLA)"
+    "📊 Raporlama (SLA)",
+    "🌐 Tehdit İstihbaratı (TIP)",
+    "🌍 Dış Yüzey (ASM)",
+    "🕵️ Tehdit Avı (Hunt)"
 ])
+
+if "auto_isolated_agents" not in st.session_state:
+    st.session_state.auto_isolated_agents = set()
 
 with tab1:
     st.subheader(f"🚨 {st.session_state.current_tenant} - Genel Olay Yöneticisi")
     
     with st.spinner("Güvenlik olayları (Logs/Alerts) derleniyor..."):
         alerts = connector.get_alerts(limit=50)
+        
+        # --- TRUE SOAR AUTOMATION (PLAYBOOKS) ---
+        from core.playbooks import evaluate_and_respond
+        # We only run automation if we are looking at the Tenant's real connected data
+        # Actually, the Playbook checks `connector`. DummyEDR will just "print" success.
+        playbook_notifications = evaluate_and_respond(
+            alerts=alerts,
+            connector=connector,
+            isolated_history=st.session_state.auto_isolated_agents
+        )
+        
+        for notif in playbook_notifications:
+            st.toast(f"🤖 **SOAR OTO-İzolasyon:** {notif['agent']}\n{notif['message']}", icon="🚨")
     
     if alerts:
         # Convert UnifiedAlert instances to dictionary format for DataFrame
@@ -127,51 +188,55 @@ with tab1:
         st.dataframe(styled_df, use_container_width=True, height=400)
         
         # --- SOAR (Active Response) SECTION ---
-        st.markdown("---")
-        st.subheader("⚡ Aktif Müdahale (SOAR)")
-        st.markdown("Tehdit algılanan makineyi anında ağdan izole ederek (Firewall Drop) saldırının yayılmasını önleyin.")
-        
-        # Sadece kritik alarm üreten makineleri listele
-        threat_agents = df_events[df_events['Önem'].isin(['Critical', 'High'])]['Ajan'].unique()
-        
-        if len(threat_agents) > 0:
-            c_action1, c_action2, c_action3 = st.columns([2, 1, 1])
-            with c_action1:
-                target_agent = st.selectbox("İzole Edilecek / Açılacak Makineyi Seçin:", threat_agents)
+        if user["role"] == "L2_Analyst":
+            st.markdown("---")
+            st.subheader("⚡ Aktif Müdahale (SOAR)")
+            st.markdown("Tehdit algılanan makineyi anında ağdan izole ederek (Firewall Drop) saldırının yayılmasını önleyin.")
             
-            # Extract agent ID from "AgentName (ID)" format
-            import re
-            agent_id = None
-            match = re.search(r'\((.*?)\)', target_agent)
-            if match:
-                agent_id = match.group(1).strip()
+            # Sadece kritik alarm üreten makineleri listele
+            threat_agents = df_events[df_events['Önem'].isin(['Critical', 'High'])]['Ajan'].unique()
             
-            with c_action2:
-                st.write("") # Spacer
-                st.write("")
-                if st.button("🔴 Ağı Kes (İzole Et)", use_container_width=True, type="primary"):
-                    if agent_id:
-                        with st.spinner(f"{target_agent} acil durum izolasyonuna alınıyor..."):
-                            success = connector.isolate_endpoint(agent_id=agent_id)
-                            if success:
-                                st.success(f"BAŞARILI! {target_agent} makinesinin tüm ağ ve internet iletişimi EDR üzerinden kesildi.")
-                                st.balloons()
-                            else:
-                                st.error("İzolasyon API çağrısı başarısız oldu. Logları kontrol edin.")
-            
-            with c_action3:
-                st.write("") # Spacer
-                st.write("")
-                if st.button("🟢 İzoleyi Kaldır (Ağı Aç)", use_container_width=True):
-                    if agent_id:
-                        with st.spinner(f"{target_agent} ağ erişimi geri yükleniyor..."):
-                            success = connector.unisolate_endpoint(agent_id=agent_id)
-                            if success:
-                                st.success(f"BAŞARILI! {target_agent} makinesinin ağ iletişimi tekrar sağlandı.")
-                            else:
-                                st.error("İzolasyon kaldırma API çağrısı başarısız oldu.")
+            if len(threat_agents) > 0:
+                c_action1, c_action2, c_action3 = st.columns([2, 1, 1])
+                with c_action1:
+                    target_agent = st.selectbox("İzole Edilecek / Açılacak Makineyi Seçin:", threat_agents)
+                
+                # Extract agent ID from "AgentName (ID)" format
+                import re
+                agent_id = None
+                match = re.search(r'\((.*?)\)', target_agent)
+                if match:
+                    agent_id = match.group(1).strip()
+                
+                with c_action2:
+                    st.write("") # Spacer
+                    st.write("")
+                    if st.button("🔴 Ağı Kes (İzole Et)", use_container_width=True, type="primary"):
+                        if agent_id:
+                            with st.spinner(f"{target_agent} acil durum izolasyonuna alınıyor..."):
+                                success = connector.isolate_endpoint(agent_id=agent_id)
+                                if success:
+                                    st.success(f"BAŞARILI! {target_agent} makinesinin tüm ağ ve internet iletişimi EDR üzerinden kesildi.")
+                                    st.balloons()
+                                else:
+                                    st.error("İzolasyon API çağrısı başarısız oldu. Logları kontrol edin.")
+                
+                with c_action3:
+                    st.write("") # Spacer
+                    st.write("")
+                    if st.button("🟢 İzoleyi Kaldır (Ağı Aç)", use_container_width=True):
+                        if agent_id:
+                            with st.spinner(f"{target_agent} ağ erişimi geri yükleniyor..."):
+                                success = connector.unisolate_endpoint(agent_id=agent_id)
+                                if success:
+                                    st.success(f"BAŞARILI! {target_agent} makinesinin ağ iletişimi tekrar sağlandı.")
+                                else:
+                                    st.error("İzolasyon kaldırma API çağrısı başarısız oldu.")
+            else:
+                st.info("Şu anda acil müdahale gerektiren kritik bir tehdit bulunmuyor.")
         else:
-            st.info("Şu anda acil müdahale gerektiren kritik bir tehdit bulunmuyor.")
+            st.markdown("---")
+            st.info("🔒 Aktif Müdahale (SOAR) yetkiniz bulunmamaktadır. Lütfen MSSP SOC yöneticinizle görüşün.")
 
     else:
         st.success("Tebrikler! Aktif bir ihlal bulunamadı.")
@@ -378,3 +443,147 @@ Tespit edilen en son {len(rep_alerts)} uyarının ciddiyet dağılımı:
                 mime="text/markdown",
                 use_container_width=True
             )
+
+with tab6:
+    st.subheader("🌐 Dış Tehdit İstihbaratı (Threat Intelligence - TIP)")
+    st.markdown("XDR Alarmları içerisinden otomatik çekilen IP adreslerinin küresel itibar (Reputation) ve Zafiyet taraması sonuçları.")
+
+    with st.spinner("Loglardaki IP adresleri ayrıştırılıyor ve TIP Motoruna soruluyor..."):
+        from core.threat_intel import enrich_ip
+        import re
+        
+        # We need alerts to extract IPs
+        alerts_for_tip = connector.get_alerts(limit=50)
+        
+        extracted_ips = set()
+        ip_pattern = re.compile(r'\b(?:\d{1,3}\.){3}\d{1,3}\b')
+        
+        for a in alerts_for_tip:
+           found_ips = ip_pattern.findall(a.description)
+           extracted_ips.update(found_ips)
+           
+        # Also let analyst manually check an IP
+        manual_ip = st.text_input("🔍 Manuel IP Sorgula (Örn: 185.220.101.44):")
+        if manual_ip:
+            if ip_pattern.match(manual_ip):
+                extracted_ips.add(manual_ip)
+            else:
+                st.warning("Geçersiz IPv4 Formatı")
+        
+        if extracted_ips:
+            st.write(f"Sistemde saptanan **{len(extracted_ips)}** benzersiz IP adresi için istihbarat çekiliyor...")
+            intel_data = []
+            for ip in extracted_ips:
+                res = enrich_ip(ip)
+                intel_data.append({
+                    "IP Adresi": res["ip_address"],
+                    "Risk Skoru": res["score"],
+                    "Zararlı mı?": "🔴 EVET" if res["malicious"] else "🟢 HAYIR",
+                    "Lokasyon": res["country"],
+                    "Etiketler": ", ".join(res["tags"])
+                })
+            
+            df_intel = pd.DataFrame(intel_data)
+            
+            def color_risk_score(val):
+                if val >= 8.0: return 'background-color: darkred; color: white'
+                elif val >= 5.0: return 'background-color: orange; color: black'
+                else: return 'background-color: green; color: white'
+
+            try:
+                styled_intel = df_intel.style.map(color_risk_score, subset=['Risk Skoru'])
+            except AttributeError:
+                styled_intel = df_intel.style.applymap(color_risk_score, subset=['Risk Skoru'])
+                
+            st.dataframe(styled_intel, use_container_width=True)
+            
+        else:
+            st.info("Mevcut alarmların detayında herhangi bir dış IP adresine rastlanmadı.")
+
+with tab7:
+    st.subheader("🌍 Dış Saldırı Yüzeyi Yönetimi (External ASM)")
+    st.markdown("Müşterinin internete açık varlıklarını (Açık Portlar, Zafiyetli Servisler) Hackerlardan önce proaktif olarak tespit edin.")
+    
+    # Try to guess a domain based on the tenant, or leave blank
+    default_domain = ""
+    if "Musa" in st.session_state.current_tenant:
+        default_domain = "musaholding.com.tr"
+    elif "Ahmet" in st.session_state.current_tenant:
+        default_domain = "ahmetlojistik.com"
+        
+    target_input = st.text_input("Hedef Alan Adı veya Dış IP Adresi Girin:", value=default_domain)
+    
+    if st.button("🔍 Dış Yüzeyi Tara (Shodan/Nmap Simülasyonu)", type="primary"):
+        if target_input:
+            with st.spinner(f"{target_input} hedefine yönelik detaylı port ve servis zafiyet taraması gerçekleştiriliyor... (Ortalama 2s)"):
+                from core.asm_scanner import analyze_attack_surface
+                scan_results = analyze_attack_surface(target_input)
+                
+                if scan_results:
+                    st.success(f"Tarama Tamamlandı! {target_input} üzerinde {len(scan_results)} adet internete açık servis bulundu.")
+                    
+                    df_asm = pd.DataFrame(scan_results)
+                    
+                    def color_asm_risk(val):
+                        if val == 'Kritik': return 'background-color: darkred; color: white; font-weight: bold'
+                        elif val == 'Yüksek': return 'background-color: red; color: white'
+                        elif val == 'Orta': return 'background-color: orange; color: black'
+                        else: return 'background-color: green; color: white'
+
+                    try:
+                        styled_asm = df_asm.style.map(color_asm_risk, subset=['Risk'])
+                        # Optional: highlight CVE column if it's not 'Yok'
+                        def highlight_cve(val):
+                            return 'color: red; font-weight: bold' if val != 'Yok' else ''
+                        styled_asm = styled_asm.map(highlight_cve, subset=['Zafiyet (CVE)'])
+                    except AttributeError:
+                        styled_asm = df_asm.style.applymap(color_asm_risk, subset=['Risk']).applymap(lambda v: 'color: red; font-weight: bold' if v != 'Yok' else '', subset=['Zafiyet (CVE)'])
+                        
+                    st.dataframe(styled_asm, use_container_width=True)
+                    
+                    # Add a warning if any critical/high
+                    if any(r['Risk'] in ['Kritik', 'Yüksek'] for r in scan_results):
+                        st.error("⚠️ **Kritik Dış Zafiyet Tespit Edildi!** Bu müşteri altyapısının derhal koruma altına alınması (Firewall kuralı yazılması veya VPN arkasına çekilmesi) gerekmektedir.")
+                        
+                else:
+                    st.info(f"{target_input} üzerinde dış dünyaya açık hiçbir port tespit edilemedi. (Mükemmel)")
+        else:
+            st.warning("Lütfen taramak için bir IP veya Alan Adı girin.")
+
+with tab8:
+    st.subheader("🕵️ Tehdit Avı (Threat Hunting / Sigma Translator)")
+    st.markdown("İnternette bulduğunuz genel **Sigma (YAML)** formatındaki tehdit avı kurallarını, tek tıkla kurumunuzun Wazuh / Elasticsearch arama motoruna (Lucene/KQL) çevirin.")
+    
+    default_sigma = '''title: Şüpheli PowerShell Encode Komutu
+description: Base64 ile encode edilmiş şüpheli powershell komutlarını tespit eder.
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection:
+        EventID: 4688
+        Image|endswith: '\\powershell.exe'
+        CommandLine|contains: ['-enc', '-EncodedCommand', 'Base64']
+    condition: selection
+'''
+    sigma_input = st.text_area("Sigma Kuralını (YAML) Buraya Yapıştırın:", value=default_sigma, height=250)
+    
+    if st.button("⚡ Wazuh / Elastic Sorgusuna Çevir", type="primary"):
+        if sigma_input.strip():
+            from core.sigma_translator import translate_sigma_to_wazuh
+            translation = translate_sigma_to_wazuh(sigma_input)
+            
+            if translation.get("error"):
+                st.error(f"❌ Çeviri Hatası: {translation['error']}")
+            else:
+                st.success("✅ Kural Başarıyla Çevrildi!")
+                st.markdown(f"**Kural Adı:** {translation['title']}")
+                st.markdown(f"**Açıklama:** {translation['description']}")
+                st.markdown(f"**Log Kaynağı:** `{translation['logsource']}`")
+                
+                st.markdown("### 🎯 Çalıştırılabilir Arama Sorgusu (Kibana / Wazuh)")
+                st.code(translation["query"], language="bash")
+                
+                st.info("💡 Yukarıdaki sorguyu kopyalayıp Wazuh 'Discover' veya 'Threat Hunting' sekmesindeki arama çubuğuna yapıştırarak hemen avlanmaya başlayabilirsiniz.")
+        else:
+            st.warning("Lütfen çevrilecek bir kural girin.")
