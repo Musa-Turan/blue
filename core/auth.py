@@ -7,19 +7,19 @@ USERS_DB = {
     "admin": {
         "password_hash": hashlib.sha256("musa123".encode()).hexdigest(),
         "role": "L2_Analyst",
-        "description": "MSSP SOC Yönetici Hesabı (Tüm müşterileri görebilir)",
+        "description": "MSSP SOC Admin Account (Full access to all clients)",
         "allowed_tenant": "ALL"
     },
     "ahmet_user": {
         "password_hash": hashlib.sha256("lojistik123".encode()).hexdigest(),
         "role": "Client_Admin",
-        "description": "Ahmet Lojistik IT Yöneticisi (Sadece kendi kurumunu görür, İşlem yapamaz)",
-        "allowed_tenant": "Ahmet Lojistik (Dummy)"
+        "description": "Ahmet Logistics IT Admin (Restricted to own tenant, read-only)",
+        "allowed_tenant": "Ahmet Logistics (Dummy)"
     },
     "musa_user": {
         "password_hash": hashlib.sha256("hold123".encode()).hexdigest(),
         "role": "Client_Admin",
-        "description": "Musa Holding IT Yöneticisi",
+        "description": "Musa Holding IT Admin",
         "allowed_tenant": "Musa Holding (Wazuh)"
     }
 }
