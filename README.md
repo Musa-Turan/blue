@@ -15,6 +15,15 @@ Welcome to the **Blue SOC XDR Platform**! This project is currently in its activ
 - **Vulnerability Scanner:** Display active CVEs on endpoints.
 - **MITRE ATT&CK Mapping:** Heatmap showing active tactics and techniques.
 
+## Özellikler (Test Aşamasında)
+- **Tekil Gösterge Paneli (Dashboard):** Uç noktaların (endpoint) ve aktif tehditlerin anlık canlı görünümü.
+- **Vaka Yönetimi (Incident Management):** SOAR senaryoları kullanarak uç noktaları görüntüleme ve izole etme.
+- **Süreç Ağacı ve Adli Bilişim (Forensics):** Şüpheli işlemlerin grafik tabanlı analizi.
+- **Yapay Zeka SOC Analisti:** Ham logları ve vakaları analiz etmek için Gemini AI destekli yapay zeka asistanı.
+- **Tehdit İstihbaratı (TIP):** Harici istihbarat servisleri (örn. Shodan, VirusTotal) kullanarak şüpheli IP adreslerinin sorgulanması.
+- **Zafiyet Tarayıcı (Vulnerability Scanner):** Uç noktalardaki aktif CVE zafiyetlerinin listelenmesi.
+- **MITRE ATT&CK Eşleştirmesi:** Aktif taktik ve teknikleri gösteren ısı haritası (Heatmap).
+
 ## Prerequisites
 - Python 3.9+
 - A running instance of **Wazuh Manager** (API enabled)
