@@ -1,19 +1,19 @@
-# Blue SOC XDR Platform 🛡️
+# Blue SOC XDR Platform
 
-**Status:** 🚧 **BETA / TEST PHASE (Geliştirme Aşamasında)** 🚧
+**Status:** BETA / TEST PHASE (Geliştirme Aşamasında)
 
 MSSP operasyonlarında kullanılabilecek, özellikle güvenlik uzmanları tarafında çoklu müşteri yönetimini tek ekrana indirip talep karşılama ve aradığınız şeye daha kısa zamanda ulaşmanızı sağlayacak, sekmeden sekmeye atlamanızı minimum seviyeye indirmek için tasarlanma aşamasında bir projedir.
 
 Welcome to the **Blue SOC XDR Platform**! This project is currently in its active development and testing phase. It is an eXtended Detection and Response (XDR) interface that integrates with Wazuh and OpenSearch to provide real-time alerts, incident management, threat hunting, and AI-driven SOC Analyst capabilities.
 
 ## Features (In Testing)
-- **📊 Unified Dashboard:** Live overview of endpoints and active threats.
-- **🚨 Incident Management:** View and isolate endpoints utilizing SOAR playbooks.
-- **🕸️ Process Tree & Forensics:** Graph-based analysis of suspicious processes.
-- **🤖 AI SOC Analyst:** Gemini AI powered assistant to analyze raw logs and incidents.
-- **🌐 Threat Intel (TIP):** Lookups for suspicious IPs using external intel (e.g., Shodan, VirusTotal).
-- **🛡️ Vulnerability Scanner:** Display active CVEs on endpoints.
-- **🔥 MITRE ATT&CK Mapping:** Heatmap showing active tactics and techniques.
+- **Unified Dashboard:** Live overview of endpoints and active threats.
+- **Incident Management:** View and isolate endpoints utilizing SOAR playbooks.
+- **Process Tree & Forensics:** Graph-based analysis of suspicious processes.
+- **AI SOC Analyst:** Gemini AI powered assistant to analyze raw logs and incidents.
+- **Threat Intel (TIP):** Lookups for suspicious IPs using external intel (e.g., Shodan, VirusTotal).
+- **Vulnerability Scanner:** Display active CVEs on endpoints.
+- **MITRE ATT&CK Mapping:** Heatmap showing active tactics and techniques.
 
 ## Prerequisites
 - Python 3.9+
