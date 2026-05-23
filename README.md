@@ -1,6 +1,8 @@
 # Blue SOC XDR Platform 🛡️
 
-**Status:** 🚧 **BETA / TEST PHASE** 🚧
+**Status:** 🚧 **BETA / TEST PHASE (Geliştirme Aşamasında)** 🚧
+
+MSSP operasyonlarında kullanılabilecek, özellikle güvenlik uzmanları tarafında çoklu müşteri yönetimini tek ekrana indirip talep karşılama ve aradığınız şeye daha kısa zamanda ulaşmanızı sağlayacak, sekmeden sekmeye atlamanızı minimum seviyeye indirmek için tasarlanma aşamasında bir projedir.
 
 Welcome to the **Blue SOC XDR Platform**! This project is currently in its active development and testing phase. It is an eXtended Detection and Response (XDR) interface that integrates with Wazuh and OpenSearch to provide real-time alerts, incident management, threat hunting, and AI-driven SOC Analyst capabilities.
 
