@@ -1,14 +1,18 @@
 import requests
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 import warnings
 import json
 warnings.filterwarnings('ignore')
 
-url_auth = 'https://192.168.1.38:55000/security/user/authenticate'
-auth = ('wazuh-wui', '.+jSKgf3IR3janqE2pWL+USnaQ6MeWxV')
+url_auth = f"https://{os.environ.get('WAZUH_MANAGER_IP', '127.0.0.1')}:55000/security/user/authenticate"
+auth = (os.environ.get('WAZUH_API_USER', 'wazuh-wui'), os.environ.get('WAZUH_API_PASSWORD', ''))
 response = requests.post(url_auth, auth=auth, verify=False, timeout=5)
 token = response.json().get('data', {}).get('token')
 
-url_agents = 'https://192.168.1.38:55000/agents?limit=10'
+url_agents = f"https://{os.environ.get('WAZUH_MANAGER_IP', '127.0.0.1')}:55000/agents?limit=10"
 headers = {'Authorization': f'Bearer {token}'}
 resp = requests.get(url_agents, headers=headers, verify=False, timeout=5)
 data = resp.json().get('data', {}).get('affected_items', [])

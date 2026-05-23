@@ -1,10 +1,14 @@
 import requests
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 import warnings
 import json
 warnings.filterwarnings('ignore')
 
-url = 'https://192.168.1.38:9200/wazuh-alerts-*/_search'
-auth = ('admin', 'WazuhAdmin2025')
+url = f"https://{os.environ.get('OPENSEARCH_HOST', '127.0.0.1')}:9200/wazuh-alerts-*/_search"
+auth = (os.environ.get('OPENSEARCH_USER', 'admin'), os.environ.get('OPENSEARCH_PASSWORD', ''))
 query = {
   'size': 10,
   'sort': [{'timestamp': {'order': 'desc'}}],

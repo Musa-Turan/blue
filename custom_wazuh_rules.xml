@@ -1,6 +1,6 @@
 <group name="windows, custom_alerts,">
 
-  <!-- Yeni Kullanıcı Oluşturma (Event ID 4720) -->
+  <!-- New User Creation (Event ID 4720) -->
   <rule id="100010" level="12">
     <if_sid>60103</if_sid>
     <field name="win.system.eventID">^4720$</field>
@@ -10,7 +10,7 @@
     </mitre>
   </rule>
 
-  <!-- CMD/PowerShell üzerinden net user komutu (Event ID 4688 - Process Creation) -->
+  <!-- 'net user' command via CMD/PowerShell (Event ID 4688 - Process Creation) -->
   <rule id="100011" level="12">
     <if_sid>60103</if_sid>
     <field name="win.system.eventID">^4688$</field>
@@ -21,7 +21,7 @@
       <id>T1059.003</id>
     </mitre>
   </rule>
-  <!-- Event Log Silinmesi (Event ID 1102 / 104) -->
+  <!-- Event Log Deletion (Event ID 1102 / 104) -->
   <rule id="100012" level="12">
     <if_sid>60103</if_sid>
     <field name="win.system.eventID">^1102$|^104$</field>
@@ -31,7 +31,7 @@
     </mitre>
   </rule>
 
-  <!-- Mimikatz Kullanımı veya LSASS Bellek Dökümü Alma (Event ID 4688) -->
+  <!-- Mimikatz Usage or LSASS Memory Dump (Event ID 4688) -->
   <rule id="100013" level="12">
     <if_sid>60103</if_sid>
     <field name="win.system.eventID">^4688$</field>
@@ -42,7 +42,7 @@
     </mitre>
   </rule>
 
-  <!-- RDP Brute Force Denemeleri (Aynı IP'den çoklu Event ID 4625) -->
+  <!-- RDP Brute Force Attempts (Multiple Event ID 4625 from same IP) -->
   <rule id="100014" level="10" frequency="5" timeframe="60">
     <if_matched_sid>60122</if_matched_sid>
     <same_source_ip />
@@ -52,7 +52,7 @@
     </mitre>
   </rule>
 
-  <!-- Gizlenmiş/Encoded PowerShell Komutları (Base64) -->
+  <!-- Hidden/Encoded PowerShell Commands (Base64) -->
   <rule id="100015" level="10">
     <if_sid>60103</if_sid>
     <field name="win.system.eventID">^4688$|^4104$</field>
@@ -64,7 +64,7 @@
     </mitre>
   </rule>
 
-  <!-- VSS (Gölge Kopya) Silinmesi - Ransomware Davranışı -->
+  <!-- VSS (Volume Shadow Copy) Deletion - Ransomware Behavior -->
   <rule id="100016" level="12">
     <if_sid>60103</if_sid>
     <field name="win.system.eventID">^4688$</field>
@@ -75,7 +75,7 @@
     </mitre>
   </rule>
 
-  <!-- Windows Defender Devre Dışı Bırakma Girişimi -->
+  <!-- Attempt to Disable Windows Defender -->
   <rule id="100017" level="11">
     <if_sid>60103</if_sid>
     <field name="win.system.eventID">^4688$</field>
@@ -86,7 +86,7 @@
     </mitre>
   </rule>
 
-  <!-- Şüpheli Ağdan İndirme (Certutil.exe İstismarı) -->
+  <!-- Suspicious Network Download (Certutil.exe Abuse) -->
   <rule id="100018" level="10">
     <if_sid>60103</if_sid>
     <field name="win.system.eventID">^4688$</field>
@@ -97,7 +97,7 @@
     </mitre>
   </rule>
 
-  <!-- Yetki Yükseltme: Administrators Grubuna Kullanıcı Ekleme -->
+  <!-- Privilege Escalation: Adding User to Administrators Group -->
   <rule id="100019" level="12">
     <if_sid>60103</if_sid>
     <field name="win.system.eventID">^4732$</field>
@@ -108,7 +108,7 @@
     </mitre>
   </rule>
 
-  <!-- Bilinen Zararlı (Malware) Klasörlerinden Çalıştırma (Temp/AppData) -->
+  <!-- Execution from Known Malware Folders (Temp/AppData) -->
   <rule id="100020" level="8">
     <if_sid>60103</if_sid>
     <field name="win.system.eventID">^4688$</field>
@@ -119,7 +119,7 @@
     </mitre>
   </rule>
 
-  <!-- Güvenlik Duvarı (Firewall) Kapatma Komutu -->
+  <!-- Firewall Disable Command -->
   <rule id="100021" level="10">
     <if_sid>60103</if_sid>
     <field name="win.system.eventID">^4688$</field>

@@ -5,7 +5,7 @@ import sys
 
 sys.stdout.reconfigure(encoding='utf-8')
 
-os.chdir(r'C:\Users\18604\OneDrive\Masaüstü\blue')
+# os.chdir(...) removed to allow running from any directory
 load_dotenv('.env')
 
 url = f"https://{os.environ.get('WAZUH_MANAGER_IP')}:55000/security/user/authenticate"

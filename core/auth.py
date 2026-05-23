@@ -5,7 +5,7 @@ import hashlib
 
 USERS_DB = {
     "admin": {
-        "password_hash": hashlib.sha256("musa123".encode()).hexdigest(),
+        "password_hash": hashlib.sha256("admin".encode()).hexdigest(),
         "role": "L2_Analyst",
         "description": "MSSP SOC Admin Account (Full access to all clients)",
         "allowed_tenant": "ALL"
