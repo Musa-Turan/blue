@@ -13,6 +13,7 @@ from connectors.wazuh_connector import WazuhConnector
 from connectors.dummy_edr_connector import DummyEDRConnector
 from core.auth import authenticate_user
 from core.process_tree import build_process_tree
+from core.mitre_mapping import generate_mitre_heatmap_data
 from streamlit_agraph import agraph, Config
 
 # Load secrets
@@ -93,7 +94,7 @@ if st.session_state.user_profile is None:
                     if user["role"] == "Client_Admin":
                         st.session_state.current_tenant = user["allowed_tenant"]
                     else:
-                        st.session_state.current_tenant = "Musa Holding (Wazuh)"
+                        st.session_state.current_tenant = "Wazuh"
                     st.rerun()
                 else:
                     st.error("Invalid username or password!")
@@ -111,9 +112,9 @@ with st.sidebar:
     
     if user["role"] == "L2_Analyst":
         tenant_choice = st.selectbox(
-            "🏢 Tenant / Client:",
-            ["Musa Holding (Wazuh)", "Ahmet Logistics (Dummy EDR)"],
-            index=0 if "Musa" in st.session_state.current_tenant else 1
+            "🏢 Integration / Source:",
+            ["Wazuh", "Dummy EDR"],
+            index=0 if "Wazuh" in st.session_state.current_tenant else 1
         )
         st.session_state.current_tenant = tenant_choice
     else:
@@ -133,6 +134,7 @@ with st.sidebar:
             "🛡️ Vulnerabilities (Vulns)",
             "🌐 Threat Intel (TIP)",
             "🌍 Attack Surface (ASM)",
+            "🔥 MITRE ATT&CK Heatmap",
             "🕵️ Threat Hunting",
             "📋 SLA Reporting"
         ]
@@ -147,7 +149,7 @@ with st.sidebar:
 # Initialize Connector
 @st.cache_resource(show_spinner=False)
 def get_connector(tenant_name):
-    if "Musa" in tenant_name:
+    if "Wazuh" in tenant_name:
         config = {
             "WAZUH_MANAGER_IP": os.getenv("WAZUH_MANAGER_IP"),
             "WAZUH_API_PORT": os.getenv("WAZUH_API_PORT", "55000"),
@@ -212,14 +214,14 @@ if menu_selection == "📊 Overview (Dashboard)":
         with c1:
             st.markdown("##### 📈 Incident Distribution (Severity)")
             fig_pie = px.pie(df_alerts, names='Severity', hole=0.5, color='Severity', 
-                             color_discrete_map={'Critical':'#FF2B2B', 'High':'#FF7A00', 'Medium':'#F4D03F', 'Low':'#117A65'})
+                             color_discrete_map={'Critical':'#FF0000', 'High':'#FF7A00', 'Medium':'#FFD700', 'Low':'#000080'})
             fig_pie.update_layout(plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", margin=dict(t=0, b=0, l=0, r=0))
             st.plotly_chart(fig_pie, use_container_width=True)
             
         with c2:
             st.markdown("##### 🖥️ Top Targeted Machines")
             fig_bar = px.histogram(df_alerts, x='Machine', color='Severity', barmode='stack', 
-                                   color_discrete_map={'Critical':'#FF2B2B', 'High':'#FF7A00', 'Medium':'#F4D03F', 'Low':'#117A65'})
+                                   color_discrete_map={'Critical':'#FF0000', 'High':'#FF7A00', 'Medium':'#FFD700', 'Low':'#000080'})
             fig_bar.update_layout(plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", margin=dict(t=0, b=0, l=0, r=0))
             st.plotly_chart(fig_bar, use_container_width=True)
     else:
@@ -395,7 +397,7 @@ elif menu_selection == "🌐 Threat Intel (TIP)":
 
 
 elif menu_selection == "🌍 Attack Surface (ASM)":
-    target_input = st.text_input("Target Domain / IP:", value="musaholding.com.tr" if "Musa" in st.session_state.current_tenant else "ahmetlogistics.com")
+    target_input = st.text_input("Target Domain / IP:", value="example-corp.com" if "Wazuh" in st.session_state.current_tenant else "test-domain.local")
     if st.button("🔍 Scan Attack Surface", type="primary"):
         with st.spinner("Running Nmap and Shodan simulation..."):
             from core.asm_scanner import analyze_attack_surface
@@ -421,6 +423,32 @@ elif menu_selection == "🕵️ Threat Hunting":
             st.code(res["query"], language="bash")
 
 
+elif menu_selection == "🔥 MITRE ATT&CK Heatmap":
+    st.markdown("#### 🗺️ MITRE ATT&CK Coverage")
+    st.markdown("<p style='color:#8B949E; font-size:0.95rem;'>This heatmap highlights the intensity of active threats mapped against the MITRE framework.</p>", unsafe_allow_html=True)
+    
+    matrix_df = generate_mitre_heatmap_data(alerts)
+    
+    fig = px.imshow(
+        matrix_df, 
+        text_auto=True, 
+        aspect="auto",
+        color_continuous_scale="Reds",
+        labels=dict(x="Tactics", y="Techniques", color="Alert Count")
+    )
+    
+    fig.update_layout(
+        plot_bgcolor="rgba(0,0,0,0)", 
+        paper_bgcolor="rgba(0,0,0,0)",
+        xaxis_title="",
+        yaxis_title="",
+        font=dict(color="#8B949E"),
+        margin=dict(l=20, r=20, t=20, b=20)
+    )
+    
+    st.plotly_chart(fig, use_container_width=True)
+
+
 elif menu_selection == "📋 SLA Reporting":
     c_rep1, c_rep2 = st.columns([2, 1])
     with c_rep1:
@@ -429,7 +457,10 @@ elif menu_selection == "📋 SLA Reporting":
     with c_rep2:
         st.write(""); st.write("")
         if st.button("📄 Synthesize Report", use_container_width=True, type="primary"):
-            st.success("Report generated. Please review the 'Visual Preview' below.")
-            md = f"# SOC SLA Report - {st.session_state.current_tenant}\n\n**Period:** {report_period} | **Prepared By:** {report_author}\n\n- Active Devices: {len(active_endpoints)}\n- Total Incidents: {len(alerts)}\n"
-            st.markdown(md)
-            st.download_button("Download (.md)", data=md, file_name="report.md", mime="text/markdown")
+            st.session_state.report_ready = True
+            
+    if st.session_state.get("report_ready"):
+        st.success("Report generated. Please review the 'Visual Preview' below.")
+        md = f"# SOC SLA Report - {st.session_state.current_tenant}\n\n**Period:** {report_period} | **Prepared By:** {report_author}\n\n- Active Devices: {len(active_endpoints)}\n- Total Incidents: {len(alerts)}\n"
+        st.markdown(md)
+        st.download_button("Download (.md)", data=md, file_name="report.md", mime="text/markdown")

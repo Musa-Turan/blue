@@ -13,14 +13,14 @@ USERS_DB = {
     "ahmet_user": {
         "password_hash": hashlib.sha256("lojistik123".encode()).hexdigest(),
         "role": "Client_Admin",
-        "description": "Ahmet Logistics IT Admin (Restricted to own tenant, read-only)",
-        "allowed_tenant": "Ahmet Logistics (Dummy)"
+        "description": "IT Admin (Restricted to own tenant, read-only)",
+        "allowed_tenant": "Dummy EDR"
     },
     "musa_user": {
         "password_hash": hashlib.sha256("hold123".encode()).hexdigest(),
         "role": "Client_Admin",
-        "description": "Musa Holding IT Admin",
-        "allowed_tenant": "Musa Holding (Wazuh)"
+        "description": "IT Admin",
+        "allowed_tenant": "Wazuh"
     }
 }
 

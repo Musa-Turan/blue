@@ -1,0 +1,18 @@
+2026-05-23 00:05:35.660 "ui.hideSidebarNav" is not a valid config option. If you previously had this config option set, it may have been removed.
+
+Collecting usage statistics. To deactivate, set browser.gatherUsageStats to false.
+
+2026-05-23 00:05:35.793 Uvicorn server started on 0.0.0.0:8501
+
+  You can now view your Streamlit app in your browser.
+
+  Local URL: http://localhost:8501
+  Network URL: http://192.168.1.20:8501
+  External URL: http://176.234.214.30:8501
+
+  For better performance, install the Watchdog module:
+
+  $ xcode-select --install
+  $ pip install watchdog
+            
+  Stopping...
