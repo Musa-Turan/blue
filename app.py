@@ -203,7 +203,7 @@ if menu_selection == "📊 Overview (Dashboard)":
     # 2. Charts Row
     c1, c2 = st.columns(2)
     if alerts:
-        # Prepare data for charts
+        #  Prepare data for charts
         df_alerts = pd.DataFrame([{
             "Time": a.timestamp,
             "Severity": a.severity,
